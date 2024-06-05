@@ -160,7 +160,7 @@ window.addEventListener("load", async () => {
     .querySelector(".btn-start")
     .addEventListener("click", async () => {
       if (!publicKey) return alert("You should connect wallet first");
-      const req = await fetch("/start");
+      const req = await fetch(`/start/${user_id}`);
       const res = await req.json();
       if (res.ok) {
         alert("Started");

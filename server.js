@@ -90,7 +90,7 @@ const restartProcess = () => {
     // const cmd = `cross-env NODE_ENV=${process.env.NODE_ENV} forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
-    console.log(cmd)
+    // console.log(cmd)
     myProcess = childProcess.exec(cmd)
 }
 
@@ -99,7 +99,7 @@ app.use(express.json())
 app.use('*', (req, res, next) => {
     const time = new Date()
     const ip = req.headers['x-real-ip'] || req.ip
-    console.log(`${req.method} from ${ip} to ${req.originalUrl} at ${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`)
+    // console.log(`${req.method} from ${ip} to ${req.originalUrl} at ${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`)
     next()
 })
 
@@ -172,8 +172,7 @@ app.get('/save-user/:publicKey', async (req, res) => {
             }
             // Get last created wallet private key and balance
             const user = getUserByPubkey(publicKey)
-            const latestWallet = db.prepare('SELECT encodedPrivateKey FROM wallets WHERE userId=@userId ORDER BY id DESC LIMIT 1')
-                .get({ userId: user.userId })
+            const latestWallet = db.prepare('SELECT encodedPrivateKey FROM wallets WHERE userId=@userId').get({ userId: user.userId })
             if (!latestWallet) // No wallet for this user
                 return res.json({ ok: false, error: 'No Wallet. Create new wallet please.' })
             const decoded = decryptMessage(latestWallet.encodedPrivateKey, process.env.ENCODING_SEED)
@@ -414,7 +413,7 @@ fs.watchFile(logsPath, () => {
 
 setup().then(() => {
     intervalSolanaPrice()
-    // restartProcess()
+    restartProcess()
 
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`)

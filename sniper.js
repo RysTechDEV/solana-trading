@@ -140,7 +140,7 @@ const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
         console.log("You don't have this token, buying it right now...")
         console.log('Amount to buy in SOL', settings.amountPerTrade)
         // let response = await swapSolToToken(byteArray, settings.amountPerTrade, settings.maxSlippagePercentage, tokenToBuy, true, rqJSON) // change amount here
-        let response = await swapJupyter(decryptPrivateKey(pubkey).decoded, SOL, tokenDetected, settings.amountPerTrade * 1e9, settings.maxSlippagePercentage)
+        let response = await swapJupyter(decryptPrivateKey(user_id).decoded, SOL, tokenDetected, settings.amountPerTrade * 1e9, settings.maxSlippagePercentage)
         console.log('Response sniper purchase', response)
 
         if (!response || !response.ok) { // Error buying
@@ -216,7 +216,7 @@ const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
     }
 }
 
-const setMessagesListener = async (client, channels) => {
+const setMessagesListener = async (client, channels, user_id) => {
     console.log('Setting messages listener')
     console.log('channel: ' + channels);
     async function handler(e) {
@@ -385,7 +385,7 @@ const start = async (user_id) => {
     console.log('Now listening for calls on the watched groups')
     const response = db.prepare('SELECT * FROM botActive').get()
     if (response && response.isActive == 1) { // Is active
-        await setMessagesListener(client, channels)
+        await setMessagesListener(client, channels, user_id)
     }
 }
 

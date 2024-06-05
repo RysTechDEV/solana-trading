@@ -368,17 +368,12 @@ const encryptAndStorePrivateKey = (privateKey, pubkey) => {
 const decryptPrivateKey = (user_id) => {
 	try {
 		// const user = getUserByPubkey(pubkey)
-		const result = db
-			.prepare("SELECT id, encodedPrivateKey FROM wallets WHERE userId=@userId ORDER BY id DESC LIMIT 1")
-			.get({ userId: user_id })
-		const decoded = decryptMessage(
-			result.encodedPrivateKey,
-			process.env.ENCODING_SEED,
-		)
+		const result = db.prepare(`SELECT encodedPrivateKey FROM wallets WHERE userId=${user_id}`).get()
+		const decoded = decryptMessage(result.encodedPrivateKey, process.env.ENCODING_SEED)
 		return {
 			ok: true,
 			decoded,
-			id: result.id
+			id: user_id
 		}
 	} catch (e) {
 		return { ok: false, error: e }

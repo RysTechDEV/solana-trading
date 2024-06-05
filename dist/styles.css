@@ -467,7 +467,7 @@ body .logger {
   border: 1px solid rgba(57, 53, 53, 0.489);
   border-radius: 10px;
   width: 100%;
-  height: 200px;
+  height: 180px;
   padding-bottom: 20px;
 }
 body .logger .logger-screen {
@@ -476,7 +476,7 @@ body .logger .logger-screen {
   margin: 10px;
   color: white;
   font-size: 10px;
-  max-height: 180px;
+  max-height: 150px;
 }
 body .my-div {
   background-color: gray;
