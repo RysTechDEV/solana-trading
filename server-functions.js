@@ -365,12 +365,12 @@ const encryptAndStorePrivateKey = (privateKey, pubkey) => {
 	}
 }
 
-const decryptPrivateKey = (pubkey) => {
+const decryptPrivateKey = (user_id) => {
 	try {
-		const user = getUserByPubkey(pubkey)
+		// const user = getUserByPubkey(pubkey)
 		const result = db
 			.prepare("SELECT id, encodedPrivateKey FROM wallets WHERE userId=@userId ORDER BY id DESC LIMIT 1")
-			.get({ userId: user.userId })
+			.get({ userId: user_id })
 		const decoded = decryptMessage(
 			result.encodedPrivateKey,
 			process.env.ENCODING_SEED,
@@ -450,8 +450,8 @@ const getTokenBalance = async (ownerPublicKey, tokenToTarget) => {
 }
 
 // Returns all the positions formatted with profits and unrealizedProfits which are calculated from the remaining balance the user has
-const getTrades = async (pubkey) => {
-	const privateKey = decryptPrivateKey(pubkey)
+const getTrades = async (user_id) => {
+	const privateKey = decryptPrivateKey(user_id)
 	if (!privateKey || !privateKey.ok) return { ok: false, msg: "No trades" }
 	const trades = db.prepare("SELECT * FROM trades WHERE walletId=@walletId").all({ walletId: privateKey.id })
 	const tradesSells = db.prepare("SELECT * FROM tradesSells").all()
@@ -536,14 +536,14 @@ let activeIntervals = {}
 let intervalPiece = 0 // Increases after each interval
 /// `percentageToSell` goes from 1 to 100 where 50% would be half of the position and 100 the entire position
 /// `lockProfits` means we're selling half the position after making an unrealized profit of 2x
-const sellToken = async (id, percentageToSell, lockProfits, pubkey) => {
+const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 	console.log('> Selling token called <')
-	const userId = getUserByPubkey(pubkey)
-	const privateKey = decryptPrivateKey(pubkey)
+	// const userId = getUserByPubkey(pubkey)
+	const privateKey = decryptPrivateKey(user_id)
 	if (!privateKey || !privateKey.ok) return
 	const byteArray = bs58.decode(privateKey.decoded)
 	const wallet = Keypair.fromSecretKey(byteArray)
-	const settings = db.prepare("SELECT * FROM settings").get()
+	const settings = db.prepare("SELECT * FROM settings where user_id = @userId").get({userId : user_id})
 	const tradeData = db.prepare("SELECT * FROM trades WHERE id=@id").get({ id })
 
 	if (!tradeData) {
@@ -581,14 +581,15 @@ const sellToken = async (id, percentageToSell, lockProfits, pubkey) => {
 			console.log('storing data')
 
 			db.prepare(
-				`INSERT INTO tradesSells (idAssociatedTrade, txid, address, tokensSold, solReceived)
-				VALUES (@idAssociatedTrade, @txid, @address, @tokensSold, @solReceived)`,
+				`INSERT INTO tradesSells (idAssociatedTrade, txid, address, tokensSold, solReceived, user_id)
+				VALUES (@idAssociatedTrade, @txid, @address, @tokensSold, @solReceived, @userId)`,
 			).run({
 				idAssociatedTrade: id,
 				txid: receivedData.txid,
 				address: tradeData.address,
 				tokensSold: receivedData.solSpent, // Tokens sold
 				solReceived: receivedData.tokensReceived, // This is the sol received
+				userId : user_id,
 			})
 			
 			// Only set to true once

@@ -9,6 +9,7 @@ let wallet = null;
 let autoTradingOn = false;
 let solanaPrice = 100;
 let mySocket = null;
+let user_id = null;
 
 let nonce = "";
 let publicKey = "";
@@ -31,9 +32,26 @@ window.addEventListener("load", async () => {
       return alert("Must start with @");
     }
     if (inputData) {
-      const req = await fetch(`/tg/${inputData}`);
-      const res = await req.json();
-      return getSetTgChannels();
+      const data = {
+        user_id,
+        username: inputData
+      }
+      alert("Data to send : ", data.username);
+      const req = await fetch(`/tg/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+        .then(response => response.json())
+        .then(responseData => {
+          console.log("Response from server : ", responseData);
+          return getSetTgChannels();
+        })
+        .catch(error => {
+          console.log('Error : ', error);
+        })
     }
   });
 
@@ -45,10 +63,28 @@ window.addEventListener("load", async () => {
       return alert("Must start with @");
     }
     if (inputData) {
-      const req = await fetch(`/remove-tg/${inputData}`);
-      const res = await req.json();
-      if (!res.ok) return alert(res.error);
-      return getSetTgChannels();
+      const data = {
+        username: inputData
+      }
+      const req = await fetch(`/tg/remove`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+        .then(response => response.json())
+        .then(responseData => {
+          console.log("Response from server : ", responseData);
+          if (responseData.ok) {
+            return getSetTgChannels();
+          } else {
+            alert(responseData.error);
+          }
+        })
+        .catch(error => {
+          console.log('Error : ', error);
+        });
     }
   });
 
@@ -58,62 +94,59 @@ window.addEventListener("load", async () => {
   });
   //////// End ////////
 
-  document
-    .querySelector("#create-wallet")
-    .addEventListener("click", async () => {
-      if (!publicKey) {
-        alert("You should connect wallet first");
-        return;
-      }
+  document.querySelector("#create-wallet").addEventListener("click", async () => {
+    if (!publicKey) {
+      alert("You should connect wallet first");
+      return;
+    }
 
-      if (wallet) {
-        const yes = confirm(
-          "Your previous wallet will be deleted (you still have access if you stored the private key) and a new wallet will be created, continue?"
-        );
+    if (wallet) {
+      const yes = confirm(
+        "Your previous wallet will be deleted (you still have access if you stored the private key) and a new wallet will be created, continue?"
+      );
 
-        if (yes) newWalletCreation();
-      } else {
-        newWalletCreation();
-      }
+      if (yes) newWalletCreation();
+    } else {
+      newWalletCreation();
+    }
+  });
+
+  document.querySelector("#form-settings").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const req = await fetch("/settings", {
+      method: "post",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        amountPerTrade:
+          document.querySelector("#amountPerTrade").value / solanaPrice,
+        maxSlippagePercentage: document.querySelector(
+          "#maxSlippagePercentage"
+        ).value,
+        isAutoTradingActivated: Number(autoTradingOn),
+        lockInProfits: Number(
+          document.querySelector("#lockInProfits").checked
+        ), // Boolean to number 0 false, 1 true
+        stopLossPercentage: document.querySelector("#stopLossPercentage")
+          .value,
+        trailingStopLossPercentageFromHigh: document.querySelector(
+          "#trailingStopLossPercentageFromHigh"
+        ).value,
+        percentageToTakeAtTrailingStopLoss: document.querySelector(
+          "#percentageToTakeAtTrailingStopLoss"
+        ).value,
+        rpc: document.querySelector("#rpc-input").value
+      }),
     });
-
-  document
-    .querySelector("#form-settings")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const req = await fetch("/settings", {
-        method: "post",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          amountPerTrade:
-            document.querySelector("#amountPerTrade").value / solanaPrice,
-          maxSlippagePercentage: document.querySelector(
-            "#maxSlippagePercentage"
-          ).value,
-          isAutoTradingActivated: Number(autoTradingOn),
-          lockInProfits: Number(
-            document.querySelector("#lockInProfits").checked
-          ), // Boolean to number 0 false, 1 true
-          stopLossPercentage: document.querySelector("#stopLossPercentage")
-            .value,
-          trailingStopLossPercentageFromHigh: document.querySelector(
-            "#trailingStopLossPercentageFromHigh"
-          ).value,
-          percentageToTakeAtTrailingStopLoss: document.querySelector(
-            "#percentageToTakeAtTrailingStopLoss"
-          ).value,
-          rpc: document.querySelector("#rpc-input").value,
-        }),
-      });
-      const res = await req.json();
-      if (res.ok) {
-        alert("Settings saved successfully");
-      } else {
-        alert("Error saving settings try again");
-      }
-    });
+    const res = await req.json();
+    if (res.ok) {
+      alert("Settings saved successfully");
+    } else {
+      alert("Error saving settings try again");
+    }
+  });
 
   document.querySelector("#amountPerTrade").addEventListener("input", (e) => {
     const value =
@@ -229,12 +262,12 @@ const updateCreatedBalance = async () => {
 
 const getSetTgChannels = async () => {
   // Get
-  const req = await fetch("/tgs");
+  const req = await fetch(`/get_tg/${user_id}`);
   const res = await req.json();
   // Check if there's telegram channel in array
   const btn_start = document.querySelector('.btn-start');
   const btn_stop = document.querySelector('.btn-stop');
-  if(res.tgs.length > 0) {
+  if (res.tgs.length > 0) {
     btn_start.classList.replace('disable-button', 'start-button');
     btn_stop.classList.replace('disable-button', 'stop-button');
   } else {
@@ -245,9 +278,7 @@ const getSetTgChannels = async () => {
   // Set
   document.querySelector("#active-telegram-channels").innerHTML = res.tgs
     .map((item, i) => {
-      return `<p class="mx-3"><span class="span-grey">#${i + 1}</span>${
-        item.username
-      }</p>`;
+      return `<p class="mx-3"><span class="span-grey">#${i + 1}</span>${item.username}</p>`;
     })
     .join("");
 
@@ -260,9 +291,14 @@ const connectWallet = async () => {
       publicKey = resp.publicKey.toString();
       removeAddressAndBalance();
       if (publicKey) {
-        alert("Connected wallet successfully");
+        alert(`Connected wallet successfully`);
         const req = await fetch(`/save-user/${publicKey}`);
         const res = await req.json();
+        const req_user = await fetch(`/get_userid/${publicKey}`);
+        const res_user = await req_user.json();
+        user_id = res_user.userId;
+        getSettings();
+        getSetTgChannels();
         console.log("Connecting Wallet Result", res);
         if (!res.ok) return alert(res.error);
         wallet = Keypair.fromSecretKey(bs58.decode(res.privateKey)); // Store globally
@@ -305,8 +341,7 @@ const removeAddressAndBalance = () => {
 const showAddressAndBalance = (wAddress, balance) => {
   document.querySelector(
     "#wallet-address"
-  ).innerHTML = `Wallet: <span style="margin-left: 12px; margin-right: 12px;">${wAddress}</span> Balance: <span style="margin-left: 12px; margin-right: 12px;">${
-    balance / LAMPORTS_PER_SOL
+  ).innerHTML = `Wallet: <span style="margin-left: 12px; margin-right: 12px;">${wAddress}</span> Balance: <span style="margin-left: 12px; margin-right: 12px;">${balance / LAMPORTS_PER_SOL
   }SOL</span>`;
   document.getElementById("withdraw").style.display = "block";
 };
@@ -341,7 +376,7 @@ const intervalSolana = async () => {
 };
 
 const getSettings = async () => {
-  const req = await fetch("/get-settings");
+  const req = await fetch(`/get-settings/${user_id}`);
   if (!req.ok) return;
   const res = await req.json();
 
@@ -349,36 +384,25 @@ const getSettings = async () => {
 
   autoTradingOn = !!res.settings.isAutoTradingActivated; // Converts 0 or 1 to boolean where 0 is false
   if (autoTradingOn) {
-    document.querySelectorAll(".auto-trading-button")[0].className =
-      "auto-trading-button on-button";
-    document.querySelectorAll(".auto-trading-button")[1].className =
-      "auto-trading-button off-button";
+    document.querySelectorAll(".auto-trading-button")[0].className = "auto-trading-button on-button";
+    document.querySelectorAll(".auto-trading-button")[1].className = "auto-trading-button off-button";
   } else {
-    document.querySelectorAll(".auto-trading-button")[0].className =
-      "auto-trading-button off-button";
-    document.querySelectorAll(".auto-trading-button")[1].className =
-      "auto-trading-button on-button";
+    document.querySelectorAll(".auto-trading-button")[0].className = "auto-trading-button off-button";
+    document.querySelectorAll(".auto-trading-button")[1].className = "auto-trading-button on-button";
   }
+
   document.querySelector("#lockInProfits").checked = res.settings.lockInProfits;
-  document.querySelector("#amountPerTrade").value = (
-    res.settings.amountPerTrade * solanaPrice
-  ).toFixed(3);
-  document.querySelector("#solana-amount-per-trade").innerHTML =
-    res.settings.amountPerTrade.toFixed(3);
-  document.querySelector("#maxSlippagePercentage").value =
-    res.settings.maxSlippagePercentage;
-  document.querySelector("#trailingStopLossPercentageFromHigh").value =
-    res.settings.trailingStopLossPercentageFromHigh;
-  document.querySelector("#percentageToTakeAtTrailingStopLoss").value =
-    res.settings.percentageToTakeAtTrailingStopLoss;
-  document.querySelector("#stopLossPercentage").value =
-    res.settings.stopLossPercentage;
+  document.querySelector("#amountPerTrade").value = (res.settings.amountPerTrade * solanaPrice).toFixed(3);
+  document.querySelector("#solana-amount-per-trade").innerHTML = (Number(res.settings.amountPerTrade)).toFixed(3);
+  document.querySelector("#maxSlippagePercentage").value = res.settings.maxSlippagePercentage;
+  document.querySelector("#trailingStopLossPercentageFromHigh").value = res.settings.trailingStopLossPercentageFromHigh;
+  document.querySelector("#percentageToTakeAtTrailingStopLoss").value = res.settings.percentageToTakeAtTrailingStopLoss;
+  document.querySelector("#stopLossPercentage").value = res.settings.stopLossPercentage;
   document.querySelector("#rpc-input").value = res.settings.rpc;
 };
 
 const setSocket = async () => {
   console.log("Starting socket");
-  //    mySocket = io('https://solana.tasend.com')
   mySocket = io();
   console.log("Socket started");
 
@@ -450,58 +474,33 @@ const getTrades = async () => {
         else if (trade.unrealizedProfit > 0) classUnrealizedProfit = "green";
         return `
                 <div class="d-flex flex-row body-row">
-                    <div class="border-right border-down">#${
-                      tradesLength - i
-                    }</div>
-                    <div class="border-right border-down">${trade.symbol}</div>
-                    <div class="border-right border-down">
-                        <button class="token-address-btn d-flex flex-row">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                                class="bi bi-copy" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd"
-                                    d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h1v1z" />
-                        </svg>
-                        <a href="https://solscan.io/token/${
-                          trade.address
-                        }" target="_blank">${formatString(trade.address)}</a>
+                  <div class="border-right border-down">#${tradesLength - i}</div>
+                  <div class="border-right border-down">${trade.symbol}</div>
+                  <div class="border-right border-down">
+                    <button class="token-address-btn d-flex flex-row">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h1v1z" />
+                      </svg>
+                      <a href="https://solscan.io/token/${trade.address}" target="_blank">${formatString(trade.address)}</a>
                     </button>
+                  </div>
+                <div class="border-right border-down">
+                    <a href="https://solscan.io/tx/${trade.txid}" target="_blank">${formatString(trade.txid)}</a>
                 </div>
                 <div class="border-right border-down">
-                    <a href="https://solscan.io/tx/${
-                      trade.txid
-                    }" target="_blank">${formatString(trade.txid)}</a>
+                    <a href="https://birdeye.so/token/${trade.address}?chain=solana" target="_blank">Birdeye</a>
                 </div>
-                <div class="border-right border-down">
-                    <a href="https://birdeye.so/token/${
-                      trade.address
-                    }?chain=solana" target="_blank">Birdeye</a>
-                </div>
-                <div class="border-right border-down ${classUnrealizedProfit}">${trade.unrealizedProfit.toFixed(
-          5
-        )} <br/>(${trade.unrealizedProfitPercentage.toFixed(2)}%)</div>
-                <div class="border-right border-down ${classProfit}">${
-          classProfit == "green" ? "+" : ""
-        }${
-          String(trade.profit).length > 5
-            ? trade.profit.toFixed(5)
-            : trade.profit
-        } SOL <br/>(${trade.profitPercentage.toFixed(2)}%)</div>
-                <div class="border-right border-down">${
-                  trade.lockedInProfits ? "Yes" : "No"
-                } / ${trade.lostTrackOfToken ? "Yes" : "No"}</div>
-                <div class="border-down"><button class="sell-button ${
-                  trade.unrealizedProfit == 0 ? "disabled-sell" : ""
-                }" onclick='sellTrade("${trade.id}")'>Sell</button></div>
+                <div class="border-right border-down ${classUnrealizedProfit}">${trade.unrealizedProfit.toFixed(5)} <br/>(${trade.unrealizedProfitPercentage.toFixed(2)}%)</div>
+                <div class="border-right border-down ${classProfit}">${classProfit == "green" ? "+" : ""}${String(trade.profit).length > 5 ? trade.profit.toFixed(5) : trade.profit} SOL <br/>(${trade.profitPercentage.toFixed(2)}%)</div>
+                <div class="border-right border-down">${trade.lockedInProfits ? "Yes" : "No"} / ${trade.lostTrackOfToken ? "Yes" : "No"}</div>
+                <div class="border-down"><button class="sell-button ${trade.unrealizedProfit == 0 ? "disabled-sell" : ""}" onclick='sellTrade("${trade.id}")'>Sell</button></div>
             </div>
             `;
       });
 
     html += formattedHTML.join("\n");
     html += `<div class="d-flex flex-row footer-row">
-                <p class="mx-2">Showing tokens ${
-                  startIndex + 1
-                }-${endIndex} of ${res.trades.length}</p>
-                
+                <p class="mx-2">Showing tokens ${startIndex + 1}-${endIndex} of ${res.trades.length}</p>
                 <button class="paginate-tokens mx-2">
                     Next page
                 </button>
@@ -509,14 +508,14 @@ const getTrades = async () => {
 
     document.querySelector("#trade-rows").innerHTML = html;
 
-    setTimeout(() => {
-      document
-        .querySelector(".paginate-tokens")
-        .addEventListener("click", () => {
-          currentPage = (currentPage % totalPages) + 1;
-          updateTradeRows();
-        });
-    }, 0);
+    // setTimeout(() => {
+    //   document
+    //     .querySelector(".paginate-tokens")
+    //     .addEventListener("click", () => {
+    //       currentPage = (currentPage % totalPages) + 1;
+    //       updateTradeRows();
+    //     });
+    // }, 0);
   };
 
   updateTradeRows();
@@ -542,9 +541,8 @@ const getTrades = async () => {
   document.querySelector("#total-sol-invested").innerHTML =
     totalSolInvested + " SOL";
   document.querySelector("#total-pnl").innerHTML = totalPNL + " SOL";
-  document.querySelector("#total-pnl").className = `border-right ${
-    totalPNL >= 0 ? "green" : "red"
-  }`;
+  document.querySelector("#total-pnl").className = `border-right ${totalPNL >= 0 ? "green" : "red"
+    }`;
   document.querySelector("#total-profits").innerHTML = totalProfit + " SOL";
   document.querySelector("#total-profits").className =
     totalProfit >= 0 ? "green" : "red";

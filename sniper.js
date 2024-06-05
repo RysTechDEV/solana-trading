@@ -51,8 +51,8 @@ const login = async () => {
     return client
 }
 
-const getTelegramChannelsToWatch = () => {
-    const results = db.prepare('SELECT * FROM telegramChannels').all()
+const getTelegramChannelsToWatch = (user_id) => {
+    const results = db.prepare('SELECT * FROM telegramChannels where user_id = @userId').all({ userId: user_id })
     return results.map(item => item.username)
 }
 
@@ -63,8 +63,6 @@ const extractTokenToSnipe = message => {
         https://birdeye.so/token/J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn?chain=solana
         https://birdeye.so/token/4nBdirGQHybv1nYQrsnKZsMWBvChWYx7ejvAgrGEgepV/BZCzRDpTohgX4iKhyHZBHPe1oMoEXzpKKU99NUFqvYdB?chain=solana
     */
-    console.log("123123");
-    console.log(message);
     const dexscreenerRegex = /dexscreener\.com\/solana\/(.{44})/i
     const birdeyeRegex = /birdeye\.so\/token\/(.+)\?chain=solana/i
     const matchBirdeye = birdeyeRegex.exec(message)
@@ -92,14 +90,14 @@ let intervalPiece = 0 // Increases after each interval
 /// Returns false if you already hold the token (it won't buy then)
 /// Docs: Tries to buy once then it checks 3 times after an interval of 30 seconds in between. If the tokens
 /// aren't detected then, it will buy again and check 3 more times. If we don't get the tokens then it will stop
-const buyTokenIfNotAlready = async tokenToBuy => {
-    const privateKey = decryptPrivateKey(pubkey)
+const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
+    const privateKey = decryptPrivateKey(user_id)
     console.log(privateKey);
     if (!privateKey || !privateKey.ok) return
     const byteArray = bs58.decode(privateKey.decoded)
     const wallet = Keypair.fromSecretKey(byteArray)
     const ownerAddress = wallet.publicKey.toBase58()
-    const settings = db.prepare('SELECT * FROM settings').get()
+    const settings = db.prepare('SELECT * FROM settings where user_id = @userId').get({ userId: user_id })
     const connection = new Connection(getRPC())
     console.log('ab')
     const tokenAccs = await connection.getParsedTokenAccountsByOwner(
@@ -131,13 +129,11 @@ const buyTokenIfNotAlready = async tokenToBuy => {
     }
 
     const tokenDetected = String(results.pool.baseMint) == SOL ? String(results.pool.quoteMint) : String(results.pool.baseMint)
-    if (currentlyBuying[tokenDetected]) return console.log('Already in the process of buying token', tokenDetected)
 
-    if (results.pool && (
-        tokensNonZeroBalance.includes(String(results.pool.baseMint).toLowerCase())
-        || tokensNonZeroBalance.includes(String(results.pool.quoteMint).toLowerCase())
-    )
-    ) {
+    if (currentlyBuying[tokenDetected])
+        return console.log('Already in the process of buying token', tokenDetected)
+
+    if (results.pool && (tokensNonZeroBalance.includes(String(results.pool.baseMint).toLowerCase()) || tokensNonZeroBalance.includes(String(results.pool.quoteMint).toLowerCase()))) {
         console.log('Token found, you already have it.')
         return false
     } else {
@@ -247,7 +243,7 @@ const setMessagesListener = async (client, channels) => {
             console.log('Token to buy detected', tokenToBuy)
 
             // Buys the token mentioned
-            return buyTokenIfNotAlready(tokenToBuy)
+            return buyTokenIfNotAlready(tokenToBuy, user_id)
         }
     }
 
@@ -301,9 +297,7 @@ const getOrInsertMonitoringData = item => {
 }
 
 const updateTradeMonitoring = item => {
-    db.prepare(`UPDATE tradeMonitoring 
-        SET highestProfitPercentage = @highestProfitPercentage, highestProfitValue = @highestProfitValue
-        WHERE idAssociatedTrade = @idAssociatedTrade`).run({
+    db.prepare(`UPDATE tradeMonitoring SET highestProfitPercentage = @highestProfitPercentage, highestProfitValue = @highestProfitValue WHERE idAssociatedTrade = @idAssociatedTrade`).run({
         idAssociatedTrade: item.id,
         highestProfitPercentage: item.unrealizedProfitPercentage,
         highestProfitValue: item.unrealizedProfit, // Half of the solana you spent
@@ -315,13 +309,13 @@ const updateTradeMonitoring = item => {
 /// 2. Check the unrealized profit and see how far they are from the stop loss
 /// 3. Execute stop losses when needed
 /// 4. It also monitors trailing stop losses and takes profits when hit
-const watcherStopLossAndTakeProfit = () => {
+const watcherStopLossAndTakeProfit = (user_id) => {
     //    let flag = false;
     setInterval(async () => {
         //        if(flag == false) {
         //            flag = true;
-        const settings = db.prepare('SELECT * FROM settings').get()
-        const responseTrades = await getTrades(pubkey)
+        const settings = db.prepare('SELECT * FROM settings where user_id = @userId').get({ userId: user_id })
+        const responseTrades = await getTrades(user_id)
         if (!responseTrades || !responseTrades.ok) return
         responseTrades.trades.forEach(async item => {
             if (item.unrealizedProfitPercentage <= -settings.stopLossPercentage) {
@@ -332,7 +326,7 @@ const watcherStopLossAndTakeProfit = () => {
                 !item.lockedInProfits &&
                 item.unrealizedProfitPercentage >= 100) { // If you've doubled your money, sell half and keep the rest running
                 console.log('Second')
-                return await sellToken(item.id, 50, true, pubkey)
+                return await sellToken(item.id, 50, true, user_id)
             } else if (
                 (settings.lockInProfits && item.lockedInProfits) || !settings.lockInProfits
             ) {
@@ -343,7 +337,7 @@ const watcherStopLossAndTakeProfit = () => {
                     // Trailing stop loss hit, skim a take profit and move the trailing stop loss down
                     if (distanceFromTrailingSL >= settings.trailingStopLossPercentageFromHigh) {
                         console.log('Third')
-                        const responseSell = await sellToken(item.id, settings.percentageToTakeAtTrailingStopLoss, false, pubkey) // Take some off
+                        const responseSell = await sellToken(item.id, settings.percentageToTakeAtTrailingStopLoss, false, user_id) // Take some off
                         if (responseSell.ok) {
                             // Update monitoring
                             updateTradeMonitoring(item)
@@ -360,7 +354,7 @@ const watcherStopLossAndTakeProfit = () => {
     }, 7e3)
 }
 
-const start = async () => {
+const start = async (user_id) => {
     const mainnetPath = path.join(__dirname, 'mainnet.json')
     if (!fs.existsSync(mainnetPath)) {
         await updateMainnetData()
@@ -368,7 +362,7 @@ const start = async () => {
     raydiumLiquidity = fs.readFileSync(path.join(__dirname, 'mainnet.json'), 'utf-8')
 
     const connection = new Connection(getRPC())
-    const privateKey = decryptPrivateKey(pubkey)
+    const privateKey = decryptPrivateKey(user_id)
     if (!privateKey || !privateKey.ok) { } else {
         const byteArray = bs58.decode(privateKey.decoded)
         const wallet = Keypair.fromSecretKey(byteArray)
@@ -377,10 +371,10 @@ const start = async () => {
     }
 
     // watcherRaydiumPairLiquidity()
-    watcherStopLossAndTakeProfit()
+    watcherStopLossAndTakeProfit(user_id)
 
     const client = await login()
-    const channels = getTelegramChannelsToWatch()
+    const channels = getTelegramChannelsToWatch(user_id)
     console.log('Channels', channels)
 
     console.log('Joining channels...')
@@ -395,7 +389,10 @@ const start = async () => {
     }
 }
 
-start()
+module.exports = {
+    start
+}
+// start()
 
 /*
     1. See what tokens the user has

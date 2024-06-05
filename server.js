@@ -1,17 +1,18 @@
 require('./dotenv-flow')
 
+
 const port = 8755
 const path = require('path')
 const express = require('express')
 const app = express()
 const bs58 = require('bs58')
-const { Connection, 
-    Keypair, 
-    clusterApiUrl, 
-    PublicKey, 
-    SystemProgram, 
-    Transaction, 
-    sendAndConfirmTransaction, 
+const { Connection,
+    Keypair,
+    clusterApiUrl,
+    PublicKey,
+    SystemProgram,
+    Transaction,
+    sendAndConfirmTransaction,
     LAMPORTS_PER_SOL } = require('@solana/web3.js')
 const Database = require("better-sqlite3")
 //const sqlite3 = require('sqlite3').verbose();
@@ -23,12 +24,13 @@ const http = require('http')
 const fs = require('fs')
 const server = http.createServer(app)
 const { Server } = require("socket.io")
+const sniper = require('./sniper');
 const { Wallet } = require("@project-serum/anchor")
 const b58 = require('bs58');
 
 const io = new Server(server)
 const {
-	setup,
+    setup,
     decryptMessage,
     getUserByPubkey,
     encryptAndStorePrivateKey,
@@ -64,17 +66,17 @@ const intervalSolanaPrice = () => {
         })
     setInterval(() => {
         fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd')
-        .then(response => response.json())
-        .then(data => {
-            if (data && data.solana && data.solana.usd) {
-                const solPrice = data.solana.usd
-                solanaPrice = solPrice
-                console.log('Current price of SOL:', solPrice)
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching SOL price:', error)
-        })
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.solana && data.solana.usd) {
+                    const solPrice = data.solana.usd
+                    solanaPrice = solPrice
+                    console.log('Current price of SOL:', solPrice)
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching SOL price:', error)
+            })
     }, 60e3) // Every minute
 }
 
@@ -83,7 +85,7 @@ const createConnectButton = () => {
 }
 
 const restartProcess = () => {
-    if (myProcess) terminate(myProcess.pid) 
+    if (myProcess) terminate(myProcess.pid)
     // const cmd = `NODE_ENV=${process.env.NODE_ENV} NODE_NO_WARNINGS=1 forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `cross-env NODE_ENV=${process.env.NODE_ENV} forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
@@ -95,50 +97,62 @@ const restartProcess = () => {
 app.use(express.static('dist'))
 app.use(express.json())
 app.use('*', (req, res, next) => {
-	const time = new Date()
-	const ip = req.headers['x-real-ip'] || req.ip
-	console.log(`${req.method} from ${ip} to ${req.originalUrl} at ${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`)
-	next()
+    const time = new Date()
+    const ip = req.headers['x-real-ip'] || req.ip
+    console.log(`${req.method} from ${ip} to ${req.originalUrl} at ${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`)
+    next()
 })
 
 app.get('/logo', (req, res) => {
-    
+
 })
 
-app.get('/tg/:username', (req, res) => {
+app.post('/tg/add', (req, res) => {
     try {
-        const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = ?').get(req.params.username)
+        const receivedData = req.body;
+        const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = @username and user_id = @user_id').get({
+            username: receivedData.username,
+            user_id : receivedData.user_id
+        })
         if (!existingUsername) {
             db.prepare(
-                'INSERT INTO telegramChannels (username) VALUES (@username)'
+                'INSERT INTO telegramChannels (username, user_id) VALUES (@username, @user_id)'
             ).run({
-                username: req.params.username,
+                username: receivedData.username,
+                user_id : receivedData.user_id
             })
         }
-        res.json({ok: true})
+        res.json({ ok: true })
     } catch (e) {
-        res.json({ok: false})
-    } 
+        res.json({ ok: false })
+    }
 })
 
-app.get('/remove-tg/:username', (req, res) => {
+app.get('/tg/remove', (req, res) => {
     try {
-        const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = ?').get(req.params.username)
+        const receivedData = req.body;
+        const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = @username and user_id = @user_id').get({
+            username: receivedData.username,
+            user_id : receivedData.user_id
+        })
         if (existingUsername) {
             db.prepare(
-                'DELETE FROM telegramChannels WHERE username = ?'
-            ).run(req.params.username)
+                'DELETE FROM telegramChannels WHERE username = @username and user_id = @user_id'
+            ).run({
+                username : receivedData.username,
+                user_id : receivedData.user_id
+            })
         } else {
-            return res.json({ok: false, error: "That username hasn't been added"})
+            return res.json({ ok: false, error: "That username hasn't been added" })
         }
-        res.json({ok: true})
+        res.json({ ok: true })
     } catch (e) {
-        res.json({ok: false, error: e})
-    } 
+        res.json({ ok: false, error: e })
+    }
 })
 
-app.get('/tgs', (req, res) => {
-    const tgs = db.prepare('SELECT * FROM telegramChannels').all()
+app.get('/get_tg/:user_id', (req, res) => {
+    const tgs = db.prepare('SELECT * FROM telegramChannels where user_id = ?').all(req.params.user_id);
     res.json({ tgs })
 })
 
@@ -149,18 +163,18 @@ app.post('/create-wallet', (req, res) => {
 
 app.get('/save-user/:publicKey', async (req, res) => {
     const publicKey = req.params.publicKey
-    if(publicKey) { // 
+    if (publicKey) { // 
         try {
             // Add user to db
             const isNew = db.prepare('SELECT * FROM users WHERE pubkey=@pubkey').get({ pubkey: publicKey })
-            if(!isNew) {
+            if (!isNew) {
                 db.prepare(`INSERT INTO users (pubkey) VALUES (@pubkey)`).run({ pubkey: publicKey })
             }
             // Get last created wallet private key and balance
             const user = getUserByPubkey(publicKey)
             const latestWallet = db.prepare('SELECT encodedPrivateKey FROM wallets WHERE userId=@userId ORDER BY id DESC LIMIT 1')
                 .get({ userId: user.userId })
-            if(!latestWallet) // No wallet for this user
+            if (!latestWallet) // No wallet for this user
                 return res.json({ ok: false, error: 'No Wallet. Create new wallet please.' })
             const decoded = decryptMessage(latestWallet.encodedPrivateKey, process.env.ENCODING_SEED)
             const connection = new Connection(getRPC())
@@ -178,11 +192,29 @@ app.get('/save-user/:publicKey', async (req, res) => {
     return { ok: false }
 })
 
+app.get('/get_userid/:publicKey', async (req, res) => {
+    const publicKey = req.params.publicKey
+    if (publicKey) {
+        try {
+            const user = getUserByPubkey(publicKey)
+            res.json({
+                ok: true,
+                userId: user.userId,
+            })
+        } catch (e) {
+            res.json({
+                ok : false,
+                error : e
+            })
+        }
+    }
+})
+
 app.get('/get-wallet', async (req, res) => {
     try {
         const latestWallet = db.prepare('SELECT encodedPrivateKey FROM wallets ORDER BY id DESC LIMIT 1').get()
         if (!latestWallet) {
-            return res.json({ok: false, error: 'No wallet'})
+            return res.json({ ok: false, error: 'No wallet' })
         }
         const decoded = decryptMessage(latestWallet.encodedPrivateKey, process.env.ENCODING_SEED)
         const connection = new Connection(getRPC())
@@ -194,16 +226,16 @@ app.get('/get-wallet', async (req, res) => {
             balance,
         })
     } catch (e) {
-        res.json({ok: false, error: e})
-    } 
+        res.json({ ok: false, error: e })
+    }
 })
 
 app.post('/settings', (req, res) => {
     try {
-        const existingSettings = db.prepare('SELECT * FROM settings').get()
+        const existingSettings = db.prepare(`SELECT * FROM settings where user_id = @user_id`).get({user_id : req.body.user_id});
         if (existingSettings) {
             console.log('Settings existing')
-            db.prepare(`UPDATE settings SET 
+            db.prepare(`UPDATE settings SET
                 amountPerTrade = @amountPerTrade,
                 maxSlippagePercentage = @maxSlippagePercentage,
                 isAutoTradingActivated = @isAutoTradingActivated,
@@ -211,7 +243,8 @@ app.post('/settings', (req, res) => {
                 stopLossPercentage = @stopLossPercentage,
                 trailingStopLossPercentageFromHigh = @trailingStopLossPercentageFromHigh,
                 percentageToTakeAtTrailingStopLoss = @percentageToTakeAtTrailingStopLoss
-                WHERE singleton = 1`).run({
+                WHERE singleton = 1 and user_id = @user_id`).run({
+                    user_id: req.body.user_id,
                     amountPerTrade: req.body.amountPerTrade,
                     maxSlippagePercentage: req.body.maxSlippagePercentage,
                     isAutoTradingActivated: req.body.isAutoTradingActivated,
@@ -223,6 +256,7 @@ app.post('/settings', (req, res) => {
         } else {
             console.log('Inserting settings')
             db.prepare(`INSERT INTO settings VALUES (
+                @user_id,
                 @amountPerTrade,
                 @maxSlippagePercentage,
                 @isAutoTradingActivated,
@@ -233,30 +267,32 @@ app.post('/settings', (req, res) => {
                 @rpc,
                 @singleton
             )`).run({
-                    amountPerTrade: req.body.amountPerTrade,
-                    maxSlippagePercentage: req.body.maxSlippagePercentage,
-                    isAutoTradingActivated: req.body.isAutoTradingActivated,
-                    lockInProfits: req.body.lockInProfits,
-                    stopLossPercentage: req.body.stopLossPercentage,
-                    trailingStopLossPercentageFromHigh: req.body.trailingStopLossPercentageFromHigh,
-                    percentageToTakeAtTrailingStopLoss: req.body.percentageToTakeAtTrailingStopLoss,
-                    rpc: req.body.rpc,
-                    singleton: 1,
+                user_id: req.body.user_id,
+                amountPerTrade: req.body.amountPerTrade,
+                maxSlippagePercentage: req.body.maxSlippagePercentage,
+                isAutoTradingActivated: req.body.isAutoTradingActivated,
+                lockInProfits: req.body.lockInProfits,
+                stopLossPercentage: req.body.stopLossPercentage,
+                trailingStopLossPercentageFromHigh: req.body.trailingStopLossPercentageFromHigh,
+                percentageToTakeAtTrailingStopLoss: req.body.percentageToTakeAtTrailingStopLoss,
+                rpc: req.body.rpc,
+                singleton: 1
             })
         }
-        res.json({ok: true})
+        res.json({ ok: true })
     } catch (e) {
         console.log('Error settings', e)
-        res.json({ok: false})
+        res.json({ ok: false })
     }
 })
 
 app.get('/solana-price', (req, res) => {
-    res.json({solanaPrice})
+    res.json({ solanaPrice })
 })
 
-app.get('/start', (req, res) => {
+app.get('/start/:user_id', (req, res) => {
     console.log('Starting')
+    const user_id = req.params.user_id;
     const existingBotActive = db.prepare('SELECT * FROM botActive').get()
     if (existingBotActive) {
         console.log('botActive existing')
@@ -266,8 +302,8 @@ app.get('/start', (req, res) => {
         db.prepare(`INSERT INTO botActive (isActive) VALUES (@isActive)`).run({ isActive: 1 })
     }
     console.log("starting listeneing")
-    restartProcess()
-    res.json({ok: true})
+    sniper.start(user_id);
+    res.json({ ok: true })
 })
 
 app.get('/stop', (req, res) => {
@@ -281,7 +317,7 @@ app.get('/stop', (req, res) => {
         db.prepare(`INSERT INTO botActive (isActive) VALUES (@isActive)`).run({ isActive: 0 }) // False
     }
     restartProcess()
-    res.json({ok: true})
+    res.json({ ok: true })
 })
 
 app.post('/transfer', async (req, res) => {
@@ -291,7 +327,7 @@ app.post('/transfer', async (req, res) => {
         const user = getUserByPubkey(publicKey)
         const latestWallet = db.prepare('SELECT encodedPrivateKey FROM wallets WHERE userId=@userId ORDER BY id DESC LIMIT 1')
             .get({ userId: user.userId })
-        if(!latestWallet) // No wallet for this user
+        if (!latestWallet) // No wallet for this user
             return res.json({ ok: false, error: 'No Wallet' })
         const decoded = decryptMessage(latestWallet.encodedPrivateKey, process.env.ENCODING_SEED)
         const wallet = Keypair.fromSecretKey(bs58.decode(decoded)) // Store globally
@@ -299,7 +335,7 @@ app.post('/transfer', async (req, res) => {
         const balance = await connection.getBalance(wallet.publicKey)
         console.log('LAMPORTS_PER_SOL * amount', LAMPORTS_PER_SOL * amount)
         console.log('balance', balance)
-        if(LAMPORTS_PER_SOL * amount >= balance) return res.json({ ok: false, error: 'Insufficient sol balance' })
+        if (LAMPORTS_PER_SOL * amount >= balance) return res.json({ ok: false, error: 'Insufficient sol balance' })
         const transaction = new Transaction().add(
             SystemProgram.transfer({
                 fromPubkey: wallet.publicKey,
@@ -318,9 +354,10 @@ app.post('/transfer', async (req, res) => {
     }
 })
 
-app.get('/get-settings', (req, res) => {
-    const settings = db.prepare('SELECT * FROM settings').get()
-    if(!settings) return res.json({ ok: false })
+app.get('/get-settings/:user_id', (req, res) => {
+    const user_id = req.params.user_id;
+    const settings = db.prepare('SELECT * FROM settings where user_id = @user_id').get({user_id : user_id});
+    if (!settings) return res.json({ ok: false })
     res.json({ ok: true, settings })
 })
 
@@ -336,10 +373,10 @@ app.get('/sell/:publickey/:id', async (req, res) => {
 
 app.post('/set-rpc', async (req, res) => {
     console.log('req.body.rpc', req.body.rpc)
-    if (!req.body.rpc || req.body.rpc.length == 0) return res.json({ok: false})
-    const response = db.prepare('UPDATE settings SET rpc=@rpc').run({rpc: req.body.rpc})
+    if (!req.body.rpc || req.body.rpc.length == 0) return res.json({ ok: false })
+    const response = db.prepare('UPDATE settings SET rpc=@rpc').run({ rpc: req.body.rpc })
     console.log('response', response)
-    res.json({ok: true})
+    res.json({ ok: true })
 })
 
 io.on('connection', (socket) => {
@@ -356,9 +393,9 @@ io.on('connection', (socket) => {
     })
 })
 
-if(!fs.existsSync('logs')) {
+if (!fs.existsSync('logs')) {
     fs.mkdir('logs', (err) => {
-        if(err) throw err;
+        if (err) throw err;
     })
 }
 
@@ -377,7 +414,7 @@ fs.watchFile(logsPath, () => {
 
 setup().then(() => {
     intervalSolanaPrice()
-    restartProcess()
+    // restartProcess()
 
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`)
