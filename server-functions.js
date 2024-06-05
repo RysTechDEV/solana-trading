@@ -446,9 +446,11 @@ const getTokenBalance = async (ownerPublicKey, tokenToTarget) => {
 
 // Returns all the positions formatted with profits and unrealizedProfits which are calculated from the remaining balance the user has
 const getTrades = async (user_id) => {
+	// console.log(user_id);
 	const privateKey = decryptPrivateKey(user_id)
 	if (!privateKey || !privateKey.ok) return { ok: false, msg: "No trades" }
 	const trades = db.prepare("SELECT * FROM trades WHERE walletId=@walletId").all({ walletId: privateKey.id })
+	// console.log({trades});
 	const tradesSells = db.prepare("SELECT * FROM tradesSells").all()
 	const settings = db.prepare("SELECT * FROM settings").get()
 	const byteArray = bs58.decode(privateKey.decoded)

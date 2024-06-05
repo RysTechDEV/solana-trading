@@ -85,13 +85,13 @@ const createConnectButton = () => {
 }
 
 const restartProcess = () => {
-    if (myProcess) terminate(myProcess.pid)
+    // if (myProcess) terminate(myProcess.pid)
     // const cmd = `NODE_ENV=${process.env.NODE_ENV} NODE_NO_WARNINGS=1 forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `cross-env NODE_ENV=${process.env.NODE_ENV} forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
-    const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
+    // const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     // console.log(cmd)
-    myProcess = childProcess.exec(cmd)
+    // myProcess = childProcess.exec(cmd)
 }
 
 app.use(express.static('dist'))
@@ -360,8 +360,8 @@ app.get('/get-settings/:user_id', (req, res) => {
     res.json({ ok: true, settings })
 })
 
-app.get('/get-trades/:pubkey', async (req, res) => {
-    const tradesResponse = await getTrades(req.params.pubkey)
+app.get('/get-trades/:user_id', async (req, res) => {
+    const tradesResponse = await getTrades(req.params.user_id)
     res.json(tradesResponse) // The result is already json whether there's an error error or not
 })
 
@@ -413,7 +413,7 @@ fs.watchFile(logsPath, () => {
 
 setup().then(() => {
     intervalSolanaPrice()
-    restartProcess()
+    // restartProcess()
 
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`)

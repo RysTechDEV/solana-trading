@@ -158,7 +158,7 @@ const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
             console.log('Tokens not received, starting interval every 10 times, 3 seconds each')
             // Set an interval to check 5 times if the tokens are received 
             const interval = setInterval(async () => {
-                console.log('Checking tokens received try', intervalCounter, 'out of', 10, 'tries for:', tokenDetected)
+                console.log('Checking tokens received try', intervalCounter, 'out of', 30, 'tries for:', tokenDetected)
 
                 intervalCounter++
                 tokenReceived = await getTokenBalance(wallet.publicKey, tokenDetected)
@@ -186,13 +186,13 @@ const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
                         console.log('Error saving trade', e)
                         return { ok: false }
                     }
-                } else if (intervalCounter >= 10) {
+                } else if (intervalCounter >= 30) {
                     console.log("Enough tries, the token", tokenDetected, "wasn't detected.")
 
                     clearInterval(activeIntervals[myInterCount])
                     currentlyBuying[tokenDetected] = false
                 }
-            }, 5e3)
+            }, 3e3)
             activeIntervals[myInterCount] = interval
         } else {
             currentlyBuying[tokenDetected] = false
@@ -320,16 +320,14 @@ const watcherStopLossAndTakeProfit = (user_id) => {
         responseTrades.trades.forEach(async item => {
             if (item.unrealizedProfitPercentage <= -settings.stopLossPercentage) {
                 console.log('First')
-                return await sellToken(item.id, 100, false, pubkey)
+                return await sellToken(item.id, 100, false, user_id)
             } else if (
                 settings.lockInProfits &&
                 !item.lockedInProfits &&
                 item.unrealizedProfitPercentage >= 100) { // If you've doubled your money, sell half and keep the rest running
                 console.log('Second')
                 return await sellToken(item.id, 50, true, user_id)
-            } else if (
-                (settings.lockInProfits && item.lockedInProfits) || !settings.lockInProfits
-            ) {
+            } else if ((settings.lockInProfits && item.lockedInProfits) || !settings.lockInProfits) {
                 // Monitor trailing stop losses
                 const monitoringData = getOrInsertMonitoringData(item)
                 if (item.unrealizedProfitPercentage < monitoringData.highestProfitPercentage) { // If we may hit a trailing stop loss
@@ -351,7 +349,7 @@ const watcherStopLossAndTakeProfit = (user_id) => {
         })
         //            flag = false;
         //        }
-    }, 7e3)
+    }, 3e3)
 }
 
 const start = async (user_id) => {

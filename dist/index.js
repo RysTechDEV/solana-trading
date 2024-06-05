@@ -438,7 +438,7 @@ window.sellTrade = async (id) => {
 };
 
 const getTrades = async () => {
-  const req = await fetch(`/get-trades/${publicKey}`);
+  const req = await fetch(`/get-trades/${user_id}`);
   if (!req.ok) return;
   const res = await req.json();
   if (!res || !res.trades) return;
@@ -508,14 +508,14 @@ const getTrades = async () => {
 
     document.querySelector("#trade-rows").innerHTML = html;
 
-    // setTimeout(() => {
-    //   document
-    //     .querySelector(".paginate-tokens")
-    //     .addEventListener("click", () => {
-    //       currentPage = (currentPage % totalPages) + 1;
-    //       updateTradeRows();
-    //     });
-    // }, 0);
+    setTimeout(() => {
+      document
+        .querySelector(".paginate-tokens")
+        .addEventListener("click", () => {
+          currentPage = (currentPage % totalPages) + 1;
+          updateTradeRows();
+        });
+    }, 0);
   };
 
   updateTradeRows();
@@ -553,8 +553,8 @@ const start = async () => {
   setSocket();
   getSettings();
   getSetTgChannels();
-  //    getWallet()
-  //    getTrades()
+    //  getWallet()
+    //  getTrades()
   autoTradingOn = document
     .querySelector(".auto-trading-button")
     .className.includes("on-button");
