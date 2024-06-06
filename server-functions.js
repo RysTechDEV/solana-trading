@@ -622,19 +622,11 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 		intervalPiece++
 		const myInterCount = intervalPiece
 		const intervalSell = setInterval(async () => {
-			console.log("Selling interval check", intervalCounter, 'out of', 10, 'tries')
+			console.log("Selling interval check", intervalCounter, 'out of', 30, 'tries')
 			intervalCounter++
-			tokenBalanceAfterSelling = await getTokenBalance(
-				wallet.publicKey,
-				tradeData.address,
-			)
-			console.log("tokenBalanceAfterSellingasdf", tokenBalanceAfterSelling)
-			console.log("tokenBalanceasdf", tokenBalance)
+			tokenBalanceAfterSelling = await getTokenBalance( wallet.publicKey, tradeData.address)
 			// Token has been sold
-			if (
-				!tokenBalanceAfterSelling ||
-				tokenBalanceAfterSelling.amount < tokenBalance.amount
-			) {
+			if (!tokenBalanceAfterSelling || tokenBalanceAfterSelling.amount < tokenBalance.amount) {
 				console.log("Tokens sold, storing in the db")
 				clearInterval(activeIntervals[myInterCount])
 
@@ -645,7 +637,7 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 					console.log("Error saving trade", e)
 					return { ok: false }
 				}
-			} else if (intervalCounter >= 10) {
+			} else if (intervalCounter >= 30) {
 				console.log("Enough tries, no sell detected. Stopping.")
 				clearInterval(activeIntervals[myInterCount])
 				return { ok: false }

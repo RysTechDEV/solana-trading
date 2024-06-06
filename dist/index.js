@@ -427,7 +427,7 @@ const formatString = (myString) => {
 
 window.sellTrade = async (id) => {
   alert("Processing sell, please wait until the next message is shown");
-  const req = await fetch(`/sell/${publicKey}/${id}`);
+  const req = await fetch(`/sell/${user_id}/${id}`);
   const res = await req.json();
 
   if (res.ok) {

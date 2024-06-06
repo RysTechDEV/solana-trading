@@ -289,7 +289,7 @@ app.get('/solana-price', (req, res) => {
     res.json({ solanaPrice })
 })
 
-app.get('/start/:user_id', (req, res) => {
+app.get('/start/:user_id', async (req, res) => {
     console.log('Starting')
     const user_id = req.params.user_id;
     const existingBotActive = db.prepare('SELECT * FROM botActive').get()
@@ -301,7 +301,7 @@ app.get('/start/:user_id', (req, res) => {
         db.prepare(`INSERT INTO botActive (isActive) VALUES (@isActive)`).run({ isActive: 1 })
     }
     console.log("starting listeneing")
-    sniper.start(user_id);
+    await sniper.start(user_id);
     res.json({ ok: true })
 })
 
@@ -365,9 +365,9 @@ app.get('/get-trades/:user_id', async (req, res) => {
     res.json(tradesResponse) // The result is already json whether there's an error error or not
 })
 
-app.get('/sell/:publickey/:id', async (req, res) => {
+app.get('/sell/:user_id/:id', async (req, res) => {
     console.log("This is FIVE");
-    res.json(await sellToken(req.params.id, 100, false, req.params.publickey))
+    res.json(await sellToken(req.params.id, 100, false, req.params.user_id))
 })
 
 app.post('/set-rpc', async (req, res) => {
