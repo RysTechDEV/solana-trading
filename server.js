@@ -44,6 +44,7 @@ const web3 = require('@solana/web3.js')
 let solanaPrice = 100
 let myProcess = null
 let connectedSocketIds = []
+let userList = [];
 
 // const wallets = [
 //     new PhantomWalletAdapter(),
@@ -112,14 +113,14 @@ app.post('/tg/add', (req, res) => {
         const receivedData = req.body;
         const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = @username and user_id = @user_id').get({
             username: receivedData.username,
-            user_id : receivedData.user_id
+            user_id: receivedData.user_id
         })
         if (!existingUsername) {
             db.prepare(
                 'INSERT INTO telegramChannels (username, user_id) VALUES (@username, @user_id)'
             ).run({
                 username: receivedData.username,
-                user_id : receivedData.user_id
+                user_id: receivedData.user_id
             })
         }
         res.json({ ok: true })
@@ -133,14 +134,14 @@ app.get('/tg/remove', (req, res) => {
         const receivedData = req.body;
         const existingUsername = db.prepare('SELECT username FROM telegramChannels WHERE username = @username and user_id = @user_id').get({
             username: receivedData.username,
-            user_id : receivedData.user_id
+            user_id: receivedData.user_id
         })
         if (existingUsername) {
             db.prepare(
                 'DELETE FROM telegramChannels WHERE username = @username and user_id = @user_id'
             ).run({
-                username : receivedData.username,
-                user_id : receivedData.user_id
+                username: receivedData.username,
+                user_id: receivedData.user_id
             })
         } else {
             return res.json({ ok: false, error: "That username hasn't been added" })
@@ -163,7 +164,7 @@ app.post('/create-wallet', (req, res) => {
 
 app.get('/save-user/:publicKey', async (req, res) => {
     const publicKey = req.params.publicKey
-    if (publicKey) { // 
+    if (publicKey) {
         try {
             // Add user to db
             const isNew = db.prepare('SELECT * FROM users WHERE pubkey=@pubkey').get({ pubkey: publicKey })
@@ -202,8 +203,8 @@ app.get('/get_userid/:publicKey', async (req, res) => {
             })
         } catch (e) {
             res.json({
-                ok : false,
-                error : e
+                ok: false,
+                error: e
             })
         }
     }
@@ -231,7 +232,7 @@ app.get('/get-wallet', async (req, res) => {
 
 app.post('/settings', (req, res) => {
     try {
-        const existingSettings = db.prepare(`SELECT * FROM settings where user_id = @user_id`).get({user_id : req.body.user_id});
+        const existingSettings = db.prepare(`SELECT * FROM settings where user_id = @user_id`).get({ user_id: req.body.user_id });
         if (existingSettings) {
             console.log('Settings existing')
             db.prepare(`UPDATE settings SET
@@ -243,14 +244,14 @@ app.post('/settings', (req, res) => {
                 trailingStopLossPercentageFromHigh = @trailingStopLossPercentageFromHigh,
                 percentageToTakeAtTrailingStopLoss = @percentageToTakeAtTrailingStopLoss
                 WHERE singleton = 1 and user_id = @user_id`).run({
-                    user_id: req.body.user_id,
-                    amountPerTrade: req.body.amountPerTrade,
-                    maxSlippagePercentage: req.body.maxSlippagePercentage,
-                    isAutoTradingActivated: req.body.isAutoTradingActivated,
-                    lockInProfits: req.body.lockInProfits,
-                    stopLossPercentage: req.body.stopLossPercentage,
-                    trailingStopLossPercentageFromHigh: req.body.trailingStopLossPercentageFromHigh,
-                    percentageToTakeAtTrailingStopLoss: req.body.percentageToTakeAtTrailingStopLoss,
+                user_id: req.body.user_id,
+                amountPerTrade: req.body.amountPerTrade,
+                maxSlippagePercentage: req.body.maxSlippagePercentage,
+                isAutoTradingActivated: req.body.isAutoTradingActivated,
+                lockInProfits: req.body.lockInProfits,
+                stopLossPercentage: req.body.stopLossPercentage,
+                trailingStopLossPercentageFromHigh: req.body.trailingStopLossPercentageFromHigh,
+                percentageToTakeAtTrailingStopLoss: req.body.percentageToTakeAtTrailingStopLoss,
             })
         } else {
             console.log('Inserting settings')
@@ -291,7 +292,6 @@ app.get('/solana-price', (req, res) => {
 
 app.get('/start/:user_id', async (req, res) => {
     console.log('Starting')
-    const user_id = req.params.user_id;
     const existingBotActive = db.prepare('SELECT * FROM botActive').get()
     if (existingBotActive) {
         console.log('botActive existing')
@@ -301,7 +301,6 @@ app.get('/start/:user_id', async (req, res) => {
         db.prepare(`INSERT INTO botActive (isActive) VALUES (@isActive)`).run({ isActive: 1 })
     }
     console.log("starting listeneing")
-    await sniper.start(user_id);
     res.json({ ok: true })
 })
 
@@ -355,7 +354,7 @@ app.post('/transfer', async (req, res) => {
 
 app.get('/get-settings/:user_id', (req, res) => {
     const user_id = req.params.user_id;
-    const settings = db.prepare('SELECT * FROM settings where user_id = @user_id').get({user_id : user_id});
+    const settings = db.prepare('SELECT * FROM settings where user_id = @user_id').get({ user_id: user_id });
     if (!settings) return res.json({ ok: false })
     res.json({ ok: true, settings })
 })

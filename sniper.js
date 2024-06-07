@@ -51,9 +51,19 @@ const login = async () => {
     return client
 }
 
-const getTelegramChannelsToWatch = (user_id) => {
-    const results = db.prepare('SELECT * FROM telegramChannels where user_id = @userId').all({ userId: user_id })
+const getTelegramChannelsToWatch = () => {
+    const results = db.prepare('SELECT * FROM telegramChannels GROUP BY username').all()
     return results.map(item => item.username)
+}
+
+const getchanneluser = async (username) => {
+    const results = db.prepare('Select * from telegramChannels where username = @username').all({ username });
+    return results.map(item => item.user_id)
+}
+
+const getusers = async () => {
+    const results = db.prepare('SELECT * FROM users').all();
+    return results.map(item => item.user_id)
 }
 
 const extractTokenToSnipe = message => {
@@ -216,7 +226,7 @@ const buyTokenIfNotAlready = async (tokenToBuy, user_id) => {
     }
 }
 
-const setMessagesListener = async (client, channels, user_id) => {
+const setMessagesListener = async (client, channels) => {
     console.log('Setting messages listener')
     console.log('channel: ' + channels);
     async function handler(e) {
@@ -237,13 +247,18 @@ const setMessagesListener = async (client, channels, user_id) => {
 
         // Check if the message is in the watched groups
         if (channelNamesFound.some(element => channels.includes(element))) {
-            console.log('New message detected in this group:', channelNamesFound)
+            console.log('New message detected in this group:', channelNamesFound[0])
             const tokenToBuy = extractTokenToSnipe(message)
             if (!tokenToBuy) return // No token found
             console.log('Token to buy detected', tokenToBuy)
 
+            const channel_user = await getchanneluser(channelNamesFound[0]);
             // Buys the token mentioned
-            return buyTokenIfNotAlready(tokenToBuy, user_id)
+            channel_user.map((userItem) => {
+                buyTokenIfNotAlready(tokenToBuy, userItem);
+
+            });
+            // return buyTokenIfNotAlready(tokenToBuy, user_id);
         }
     }
 
@@ -368,11 +383,15 @@ const start = async (user_id) => {
         console.log('Using wallet', wallet.publicKey.toBase58(), 'balance', balance)
     }
 
+    const users = await getusers();
+
     // watcherRaydiumPairLiquidity()
-    watcherStopLossAndTakeProfit(user_id)
+    users.map((userItem) => {
+        watcherStopLossAndTakeProfit(userItem);
+    });
 
     const client = await login()
-    const channels = getTelegramChannelsToWatch(user_id)
+    const channels = getTelegramChannelsToWatch();
     console.log('Channels', channels)
 
     console.log('Joining channels...')
@@ -383,7 +402,7 @@ const start = async (user_id) => {
     console.log('Now listening for calls on the watched groups')
     const response = db.prepare('SELECT * FROM botActive').get()
     if (response && response.isActive == 1) { // Is active
-        await setMessagesListener(client, channels, user_id)
+        await setMessagesListener(client, channels)
     }
 }
 
