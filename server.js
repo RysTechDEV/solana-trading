@@ -86,13 +86,13 @@ const createConnectButton = () => {
 }
 
 const restartProcess = () => {
-    // if (myProcess) terminate(myProcess.pid)
+    if (myProcess) terminate(myProcess.pid)
     // const cmd = `NODE_ENV=${process.env.NODE_ENV} NODE_NO_WARNINGS=1 forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `cross-env NODE_ENV=${process.env.NODE_ENV} forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
-    // const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
+    const cmd = `node sniper.js >> ./logs/logs_all.txt 2>&1`
     // const cmd = `forever --minUptime 1000 --spinSleepTime 1000 sniper.js >> ./logs/logs_all.txt 2>&1`
-    // console.log(cmd)
-    // myProcess = childProcess.exec(cmd)
+    console.log(cmd)
+    myProcess = childProcess.exec(cmd)
 }
 
 app.use(express.static('dist'))
@@ -412,7 +412,7 @@ fs.watchFile(logsPath, () => {
 
 setup().then(() => {
     intervalSolanaPrice()
-    // restartProcess()
+    restartProcess()
 
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`)

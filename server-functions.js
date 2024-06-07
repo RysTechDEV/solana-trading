@@ -168,8 +168,8 @@ const getRPC = () => {
 		rpcData && rpcData.rpc
 			? rpcData.rpc
 			: "https://responsive-dimensional-arm.solana-mainnet.quiknode.pro/c6ec507a07c3f2e1602eeb3edcbd04bbc4fbcfc6/"
-			// : "https://api.mainnet-beta.solana.com/"
-//			: "https://rpc.ankr.com/solana/9dcc92934779a87ccda30c94b74f7195d5635242da0e3e94bfe79b3fc0de5b1f"
+	// : "https://api.mainnet-beta.solana.com/"
+	//			: "https://rpc.ankr.com/solana/9dcc92934779a87ccda30c94b74f7195d5635242da0e3e94bfe79b3fc0de5b1f"
 	return rpc
 }
 
@@ -340,7 +340,7 @@ const decryptMessage = (encryptedStr, seed) => {
 
 const getUserByPubkey = (pubkey) => {
 	const result = db.prepare("SELECT id FROM users WHERE pubkey=@pubkey").get({ pubkey })
-	if(result) {
+	if (result) {
 		return { ok: true, userId: result.id }
 	}
 	return { ok: false }
@@ -350,7 +350,7 @@ const encryptAndStorePrivateKey = (privateKey, pubkey) => {
 	try {
 		const encoded = encryptMessage(privateKey, process.env.ENCODING_SEED)
 		const user = getUserByPubkey(pubkey)
-		if(!user.ok) return { ok: false }
+		if (!user.ok) return { ok: false }
 		db.prepare(
 			"INSERT INTO wallets (encodedPrivateKey, userId) VALUES (@encodedPrivateKey, @userId)",
 		).run({
@@ -446,11 +446,9 @@ const getTokenBalance = async (ownerPublicKey, tokenToTarget) => {
 
 // Returns all the positions formatted with profits and unrealizedProfits which are calculated from the remaining balance the user has
 const getTrades = async (user_id) => {
-	// console.log(user_id);
 	const privateKey = decryptPrivateKey(user_id)
 	if (!privateKey || !privateKey.ok) return { ok: false, msg: "No trades" }
 	const trades = db.prepare("SELECT * FROM trades WHERE walletId=@walletId").all({ walletId: privateKey.id })
-	// console.log({trades});
 	const tradesSells = db.prepare("SELECT * FROM tradesSells").all()
 	const settings = db.prepare("SELECT * FROM settings").get()
 	const byteArray = bs58.decode(privateKey.decoded)
@@ -508,7 +506,7 @@ const getTrades = async (user_id) => {
 				let quote = await getAmountOutJupyter(
 					tokenFoundData.token,
 					SOL,
-//					tokenFoundData.amount,
+					//					tokenFoundData.amount,
 					trades[i].tokensReceived,
 					settings.maxSlippagePercentage,
 				)
@@ -540,7 +538,7 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 	if (!privateKey || !privateKey.ok) return
 	const byteArray = bs58.decode(privateKey.decoded)
 	const wallet = Keypair.fromSecretKey(byteArray)
-	const settings = db.prepare("SELECT * FROM settings where user_id = @userId").get({userId : user_id})
+	const settings = db.prepare("SELECT * FROM settings where user_id = @userId").get({ userId: user_id })
 	const tradeData = db.prepare("SELECT * FROM trades WHERE id=@id").get({ id })
 
 	if (!tradeData) {
@@ -567,7 +565,7 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 			console.log("Coundn't get a quote, stopping")
 			return { ok: false };
 		}
- 
+
 		const storeDb = (receivedData) => {
 			console.log('selling token')
 			console.log('selling token')
@@ -577,32 +575,35 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 			console.log('selling token')
 			console.log('storing data')
 
-			db.prepare(
-				`INSERT INTO tradesSells (idAssociatedTrade, txid, address, tokensSold, solReceived, user_id)
-				VALUES (@idAssociatedTrade, @txid, @address, @tokensSold, @solReceived, @userId)`,
-			).run({
-				idAssociatedTrade: id,
-				txid: receivedData.txid,
-				address: tradeData.address,
-				tokensSold: receivedData.solSpent, // Tokens sold
-				solReceived: receivedData.tokensReceived, // This is the sol received
-				userId : user_id,
-			})
-			
-			// Only set to true once
-			if (lockProfits) {
-				db.prepare(`UPDATE trades SET lockedInProfits = @lockedInProfits WHERE walletId=@walletId`).get({ walletId: privateKey.id})
-				.run({
-					lockedInProfits: true,
-				})
+			const trade_id = db.prepare("SELECT * FROM tradesSells WHERE idAssociatedTrade=@id").get({ id });
+
+			if (!trade_id) {
 				db.prepare(
-					`INSERT INTO tradeMonitoring (idAssociatedTrade, highestProfitPercentage, highestProfitValue)
-                    VALUES (@idAssociatedTrade, @highestProfitPercentage, @highestProfitValue)`,
+					`INSERT INTO tradesSells (idAssociatedTrade, txid, address, tokensSold, solReceived, user_id)
+					VALUES (@idAssociatedTrade, @txid, @address, @tokensSold, @solReceived, @userId)`,
 				).run({
 					idAssociatedTrade: id,
-					highestProfitPercentage: 100,
-					highestProfitValue: receivedData.tokensReceived, // Half of the solana you spent
+					txid: receivedData.txid,
+					address: tradeData.address,
+					tokensSold: receivedData.solSpent, // Tokens sold
+					solReceived: receivedData.tokensReceived, // This is the sol received
+					userId: user_id,
 				})
+				// Only set to true once
+				if (lockProfits) {
+					db.prepare(`UPDATE trades SET lockedInProfits = @lockedInProfits WHERE walletId=@walletId`).get({ walletId: privateKey.id })
+						.run({
+							lockedInProfits: true,
+						})
+					db.prepare(
+						`INSERT INTO tradeMonitoring (idAssociatedTrade, highestProfitPercentage, highestProfitValue)
+                    VALUES (@idAssociatedTrade, @highestProfitPercentage, @highestProfitValue)`,
+					).run({
+						idAssociatedTrade: id,
+						highestProfitPercentage: 100,
+						highestProfitValue: receivedData.tokensReceived, // Half of the solana you spent
+					})
+				}
 			}
 		}
 
@@ -624,7 +625,7 @@ const sellToken = async (id, percentageToSell, lockProfits, user_id) => {
 		const intervalSell = setInterval(async () => {
 			console.log("Selling interval check", intervalCounter, 'out of', 30, 'tries')
 			intervalCounter++
-			tokenBalanceAfterSelling = await getTokenBalance( wallet.publicKey, tradeData.address)
+			tokenBalanceAfterSelling = await getTokenBalance(wallet.publicKey, tradeData.address)
 			// Token has been sold
 			if (!tokenBalanceAfterSelling || tokenBalanceAfterSelling.amount < tokenBalance.amount) {
 				console.log("Tokens sold, storing in the db")
@@ -728,7 +729,7 @@ const swapJupyter = async (privateKey, tokenA, tokenB, amount, slippage) => {
 		quote = await getAmountOutJupyter(tokenA, tokenB, amount, slippage)
 		if (!quote || quote.error) {
 			if (quote.error) console.log('quote response:', quote.error)
-			return { ok: false}
+			return { ok: false }
 		}
 		amountOut = quote.outAmount
 		if (!amountOut) {

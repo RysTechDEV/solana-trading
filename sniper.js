@@ -63,7 +63,7 @@ const getchanneluser = async (username) => {
 
 const getusers = async () => {
     const results = db.prepare('SELECT * FROM users').all();
-    return results.map(item => item.user_id)
+    return results.map(item => item.id)
 }
 
 const extractTokenToSnipe = message => {
@@ -374,14 +374,14 @@ const start = async (user_id) => {
     }
     raydiumLiquidity = fs.readFileSync(path.join(__dirname, 'mainnet.json'), 'utf-8')
 
-    const connection = new Connection(getRPC())
-    const privateKey = decryptPrivateKey(user_id)
-    if (!privateKey || !privateKey.ok) { } else {
-        const byteArray = bs58.decode(privateKey.decoded)
-        const wallet = Keypair.fromSecretKey(byteArray)
-        const balance = await connection.getBalance(wallet.publicKey)
-        console.log('Using wallet', wallet.publicKey.toBase58(), 'balance', balance)
-    }
+    // const connection = new Connection(getRPC())
+    // const privateKey = decryptPrivateKey(user_id)
+    // if (!privateKey || !privateKey.ok) { } else {
+    //     const byteArray = bs58.decode(privateKey.decoded)
+    //     const wallet = Keypair.fromSecretKey(byteArray)
+    //     const balance = await connection.getBalance(wallet.publicKey)
+    //     console.log('Using wallet', wallet.publicKey.toBase58(), 'balance', balance)
+    // }
 
     const users = await getusers();
 
@@ -406,10 +406,10 @@ const start = async (user_id) => {
     }
 }
 
-module.exports = {
-    start
-}
-// start()
+// module.exports = {
+//     start
+// }
+start()
 
 /*
     1. See what tokens the user has
